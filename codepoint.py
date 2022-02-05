@@ -16,6 +16,10 @@ class Codepoint:
     2538
     >>> cp.to_uplus_notation()
     'U+09EA'
+    >>> cp
+    Codepoint(0x09EA)
+    >>> cp.numeric_type
+    'Decimal'
     >>> cp.to_numeric()
     4.0
     >>> cp.to_digit()
@@ -48,16 +52,6 @@ class Codepoint:
     @property
     def character(self) -> str:
         return chr(self._ord)
-
-    @property
-    def plane_number(self) -> int:
-        """
-        >>> Codepoint(0x61).plane_number
-        0
-        >>> Codepoint(0x01F4A9).plane_number
-        1
-        """
-        return (0xFF0000 & self.value) >> 16
 
     @property
     def script(self) -> str:
@@ -99,11 +93,12 @@ class Codepoint:
             return args[0]
 
     def to_uplus_notation(self) -> str:
-        if self.value <= 0xFFFF:
-            return f"U+{self.value:04X}"
-        else:
-            assert 0xFFFF < self.value <= 0x10FFFF
-            return f"U+{self.value:06X}"
+        """
+        Returns a string representation of the codepoint in U+ notation.
+
+        See: https://www.unicode.org/versions/Unicode13.0.0/appA.pdf
+        """
+        return f"U+{self.value:04X}"
 
     def __str__(self) -> str:
         return self.to_uplus_notation()
