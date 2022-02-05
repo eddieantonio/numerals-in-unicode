@@ -16,6 +16,8 @@ NUMERICAL_VALUE_DECIMAL = 6
 NUMERICAL_VALUE_DIGIT = 7
 NUMERICAL_VALUE_NUMERIC = 8
 BIDI_MIRRORED = 9
+# https://www.unicode.org/reports/tr24/#Data_File_SC
+SCRIPT = 1
 
 
 class CodepointRange(NamedTuple):
@@ -174,6 +176,7 @@ _general_category = PropertyLookup(default="Cc")
 _name = NamePropertyLookup(default="")
 _numeric_type = PropertyLookup(default=None)
 _numeric_value = PropertyLookup(default=nan)
+_script = PropertyLookup(default="Unknown")
 
 
 def parse_unicode_data():
@@ -214,6 +217,37 @@ def parse_unicode_data():
     """
     with open("./UnicodeData.txt", encoding="UTF-8") as data_file:
         return parse_unicode_data_lines(iter(data_file))
+
+
+def parse_scripts():
+    """
+    >>> parse_scripts()
+
+    >>> _script[ord('a')]
+    'Latin'
+    >>> _script[ord('-')]
+    'Common'
+    >>> _script[0xDFE3]
+    'Unknown'
+    >>> _script[ord('α')]
+    'Greek'
+    >>> _script[ord('д')]
+    'Cyrillic'
+    >>> _script[0x0641]
+    'Arabic'
+    """
+
+    with open("./Scripts.txt", encoding="UTF-8") as data_file:
+        # Scripts.txt is ordered BY SCRIPT, and not BY CODE POINT.
+        # Slurp all the data first, then sort it to insert ordered into the
+        # PropertyLookup
+        ordered_lines = [
+            result for line in data_file if (result := parse_line(line)) is not None
+        ]
+        ordered_lines.sort()
+
+        for code_point_range, fields in ordered_lines:
+            _script.extend_last(code_point_range, fields[SCRIPT])
 
 
 def parse_unicode_data_lines(lines):
