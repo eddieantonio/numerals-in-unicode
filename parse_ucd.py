@@ -96,7 +96,9 @@ def parse_line(line: str):
     return codepoint_range, fields
 
 
+# Sentinels
 RaiseIndexError = object()
+UsesNameRule = object()
 
 
 class PropertyLookup:
@@ -157,8 +159,17 @@ class PropertyLookup:
         return len(self._table)
 
 
+class NamePropertyLookup(PropertyLookup):
+    def __getitem__(self, codepoint: int) -> str:
+        name = super().__getitem__(codepoint)
+        if name is UsesNameRule:
+            raise NotImplementedError(f"need to generate name for U+{codepoint:04X}")
+        return name
+
+
 # https://www.unicode.org/reports/tr44/#Default_Values_Table
 _general_category = PropertyLookup(default="Cc")
+_name = NamePropertyLookup(default="")
 
 
 def parse_unicode_data():
@@ -176,6 +187,10 @@ def parse_unicode_data():
     'So'
     >>> _general_category[0x1D2E0]
     'No'
+    >>> _name[32]
+    'SPACE'
+    >>> _name[ord('💩')]
+    'PILE OF POO'
     """
     with open("./UnicodeData.txt", encoding="UTF-8") as data_file:
         return parse_unicode_data_lines(iter(data_file))
@@ -191,7 +206,9 @@ def parse_unicode_data_lines(lines):
         assert range_.is_single_code_point
         codepoint, _ = range_
 
-        if starts_implied_range(fields[NAME]):
+        raw_name = fields[NAME]
+
+        if starts_implied_range(raw_name):
             # Implied ranges are split on two lines and are indicated by the NAME field.
             next_range, next_fields = parse_line(next(lines))
             assert next_range.is_single_code_point
@@ -203,8 +220,21 @@ def parse_unicode_data_lines(lines):
             range_ = CodepointRange(codepoint, end_codepoint)
 
         _general_category.extend_last(range_, fields[GENERAL_CATEGORY])
-        # TODO: name
+        add_name(range_, raw_name)
+
         # TODO: numerical value
+
+
+def add_name(range_: CodepointRange, raw_name: str):
+    """
+    See: https://www.unicode.org/reports/tr44/#Name
+    """
+    if range_.is_range:
+        # I'm too lazy to implement codepoint range rules so...
+        # https://www.unicode.org/versions/Unicode14.0.0/ch04.pdf
+        _name.extend_last(range_, NotImplemented)
+    else:
+        _name.extend_last(range_, raw_name)
 
 
 def starts_implied_range(name: str) -> bool:
