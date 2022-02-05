@@ -4,6 +4,8 @@ Parses files from the Unicode property database
 See: http://www.unicode.org/reports/tr44/#Format_Conventions
 """
 
+from fractions import Fraction
+from math import nan
 from typing import NamedTuple
 
 # https://www.unicode.org/reports/tr44/#UnicodeData.txt
@@ -88,12 +90,12 @@ def parse_line(line: str):
     if range_marker:
         # Found a range like 0030..0039:
         end = int(end_hex, base=16)
-        codepoint_range = CodepointRange(start, end)
+        code_point_range = CodepointRange(start, end)
     else:
         # Found a single codepoint.
-        codepoint_range = CodepointRange(start, start)
+        code_point_range = CodepointRange(start, start)
 
-    return codepoint_range, fields
+    return code_point_range, fields
 
 
 # Sentinels
@@ -170,11 +172,14 @@ class NamePropertyLookup(PropertyLookup):
 # https://www.unicode.org/reports/tr44/#Default_Values_Table
 _general_category = PropertyLookup(default="Cc")
 _name = NamePropertyLookup(default="")
+_numeric_type = PropertyLookup(default=None)
+_numeric_value = PropertyLookup(default=nan)
 
 
 def parse_unicode_data():
     """
     >>> parse_unicode_data()
+
     >>> _general_category[32]
     'Zs'
     >>> _general_category[ord('1')]
@@ -187,10 +192,25 @@ def parse_unicode_data():
     'So'
     >>> _general_category[0x1D2E0]
     'No'
+
     >>> _name[32]
     'SPACE'
     >>> _name[ord('💩')]
     'PILE OF POO'
+
+    >>> _numeric_type[ord('9')]
+    'Decimal'
+    >>> _numeric_value[ord('9')]
+    9
+    >>> _numeric_type[0x2155]
+    'Numeric'
+    >>> _numeric_value[0x2155]
+    Fraction(1, 5)
+
+    >>> _numeric_value[0x1D2E0]
+    0
+    >>> _numeric_value[0x1D2E0 + 19]
+    19
     """
     with open("./UnicodeData.txt", encoding="UTF-8") as data_file:
         return parse_unicode_data_lines(iter(data_file))
@@ -221,8 +241,9 @@ def parse_unicode_data_lines(lines):
 
         _general_category.extend_last(range_, fields[GENERAL_CATEGORY])
         add_name(range_, raw_name)
-
-        # TODO: numerical value
+        add_numeral(
+            range_, *fields[NUMERICAL_VALUE_DECIMAL : NUMERICAL_VALUE_NUMERIC + 1]
+        )
 
 
 def add_name(range_: CodepointRange, raw_name: str):
@@ -235,6 +256,42 @@ def add_name(range_: CodepointRange, raw_name: str):
         _name.extend_last(range_, NotImplemented)
     else:
         _name.extend_last(range_, raw_name)
+
+
+def add_numeral(code_point_range: CodepointRange, decimal, digit, numeral):
+    if not numeral:
+        # Not a number
+        return
+
+    if decimal:
+        value = int(decimal)
+        assert 0 <= value <= 9
+        _numeric_type.extend_last(code_point_range, "Decimal")
+        _numeric_value.extend_last(code_point_range, value)
+    elif digit:
+        # Numeric_Type=Digit is kept for compatibility purposes, but not really useful.
+        value = int(digit)
+        assert 0 <= value <= 9
+        _numeric_type.extend_last(code_point_range, "Digit")
+        _numeric_value.extend_last(code_point_range, value)
+    elif numeral:
+        value = parse_numeral(numeral)
+        _numeric_type.extend_last(code_point_range, "Numeric")
+        _numeric_value.extend_last(code_point_range, value)
+
+
+def parse_numeral(numeral: str):
+    """
+    >>> parse_numeral("1/5")
+    Fraction(1, 5)
+    >>> parse_numeral("19")
+    19
+    """
+    if "/" in numeral:
+        nom, _, denom = numeral.partition("/")
+        return Fraction(int(nom), int(denom))
+
+    return int(numeral)
 
 
 def starts_implied_range(name: str) -> bool:
