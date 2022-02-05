@@ -1,6 +1,6 @@
-from unicodedata import bidirectional, decimal, digit, numeric
+from unicodedata import bidirectional
 
-from unicodedata2 import script
+import parse_ucd
 
 __all__ = ["Codepoint"]
 
@@ -61,20 +61,42 @@ class Codepoint:
 
     @property
     def script(self) -> str:
-        return script(self.character)
+        return _properties.script[self._ord]
 
     @property
     def bidirectional_class(self) -> str:
         return bidirectional(self.character)
 
+    @property
+    def numeric_type(self):
+        return _properties.numeric_type[self._ord]
+
     def to_decimal(self, *args) -> int:
-        return decimal(self.character, *args)
+        if self.numeric_type == "Decimal":
+            return _properties.numeric_value[self._ord]
+
+        if not args:
+            raise ValueError
+        else:
+            return args[0]
 
     def to_digit(self, *args) -> int:
-        return digit(self.character, *args)
+        if self.numeric_type in ("Decimal", "Digit"):
+            return _properties.numeric_value[self._ord]
+
+        if not args:
+            raise ValueError
+        else:
+            return args[0]
 
     def to_numeric(self, *args) -> float:
-        return numeric(self.character, *args)
+        if self.numeric_type is not None:
+            return float(_properties.numeric_value[self._ord])
+
+        if not args:
+            raise ValueError
+        else:
+            return args[0]
 
     def to_uplus_notation(self) -> str:
         if self.value <= 0xFFFF:
@@ -93,3 +115,6 @@ class Codepoint:
     @staticmethod
     def iterate_all_codepoints():
         return (Codepoint(cp) for cp in range(Codepoint.MAX_CODE_POINT + 1))
+
+
+_properties = parse_ucd.parse_all()

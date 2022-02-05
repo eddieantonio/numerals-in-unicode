@@ -6,6 +6,7 @@ See: http://www.unicode.org/reports/tr44/#Format_Conventions
 
 from fractions import Fraction
 from math import nan
+from types import SimpleNamespace
 from typing import NamedTuple
 
 # https://www.unicode.org/reports/tr44/#UnicodeData.txt
@@ -106,7 +107,7 @@ UsesNameRule = object()
 
 
 class PropertyLookup:
-    def __init__(self, default=RaiseIndexError):
+    def __init__(self, *, default=RaiseIndexError):
         self._table = []
         self._default = default
 
@@ -177,6 +178,19 @@ _name = NamePropertyLookup(default="")
 _numeric_type = PropertyLookup(default=None)
 _numeric_value = PropertyLookup(default=nan)
 _script = PropertyLookup(default="Unknown")
+
+
+def parse_all():
+    parse_unicode_data()
+    parse_scripts()
+
+    return SimpleNamespace(
+        general_category=_general_category,
+        name=_name,
+        numeric_type=_numeric_type,
+        numeric_value=_numeric_value,
+        script=_script,
+    )
 
 
 def parse_unicode_data():
