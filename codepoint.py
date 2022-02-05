@@ -14,10 +14,19 @@ class Codepoint:
     '৪'
     >>> cp.value
     2538
-    >>> cp.to_uplus_notation()
-    'U+09EA'
+
     >>> cp
     Codepoint(0x09EA)
+    >>> print(cp)
+    U+09EA
+
+    >>> cp.name
+    'BENGALI DIGIT FOUR'
+    >>> cp.general_category
+    'Nd'
+    >>> cp.script
+    'Bengali'
+
     >>> cp.numeric_type
     'Decimal'
     >>> cp.to_numeric()
@@ -28,13 +37,7 @@ class Codepoint:
     4
     >>> cp.bidirectional_class
     'L'
-    >>> cp.script
-    'Bengali'
-    >>> print(cp)
-    U+09EA
 
-    >>> len(list(Codepoint.iterate_all_codepoints()))
-    1114112
     """
 
     __slots__ = ("_ord",)
@@ -52,6 +55,14 @@ class Codepoint:
     @property
     def character(self) -> str:
         return chr(self._ord)
+
+    @property
+    def name(self) -> str:
+        return _properties.name[self._ord]
+
+    @property
+    def general_category(self) -> str:
+        return _properties.general_category[self._ord]
 
     @property
     def script(self) -> str:
@@ -109,6 +120,10 @@ class Codepoint:
 
     @staticmethod
     def iterate_all_codepoints():
+        """
+        >>> len(list(Codepoint.iterate_all_codepoints()))
+        1114112
+        """
         return (Codepoint(cp) for cp in range(Codepoint.MAX_CODE_POINT + 1))
 
 
