@@ -1,4 +1,4 @@
-from unicodedata import bidirectional
+from unicodedata import bidirectional, category, decomposition
 
 import parse_ucd
 
@@ -37,6 +37,8 @@ class Codepoint:
     4
     >>> cp.bidirectional_class
     'L'
+    >>> cp.decomposition
+    ''
 
     """
 
@@ -62,7 +64,7 @@ class Codepoint:
 
     @property
     def general_category(self) -> str:
-        return _properties.general_category[self._ord]
+        return category(self.character)
 
     @property
     def script(self) -> str:
@@ -75,6 +77,14 @@ class Codepoint:
     @property
     def numeric_type(self):
         return _properties.numeric_type[self._ord]
+
+    @property
+    def numeric_value(self):
+        return _properties.numeric_value[self._ord]
+
+    @property
+    def decomposition(self) -> str:
+        return decomposition(self.character)
 
     def to_decimal(self, *args) -> int:
         if self.numeric_type == "Decimal":
