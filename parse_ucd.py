@@ -59,15 +59,6 @@ class CodepointRange(NamedTuple):
         """
         return self.start <= codepoint <= self.end_inclusive
 
-    def iter_codepoints(self):
-        """
-        Yields successive codepoints (ints) in a Unicode range.
-
-        >>> list(CodepointRange(0x0030, 0x0039).iter_codepoints())
-        [48, 49, 50, 51, 52, 53, 54, 55, 56, 57]
-        """
-        return iter(range(self.start, self.end_inclusive + 1))
-
 
 class PropertyLookup:
     """
