@@ -107,7 +107,7 @@ class PropertyLookup:
             midpoint = start + ((end - start) // 2)
             record = table[midpoint]
 
-            if record.start <= codepoint <= record.end_inclusive:
+            if record.contains(codepoint):
                 return record, midpoint
             elif codepoint < record.start:
                 return binary_search(start, midpoint)
@@ -132,6 +132,8 @@ class PropertyRecord(NamedTuple):
     start: int
     end_inclusive: int
     value: Any
+
+    contains = CodepointRange.contains
 
     @classmethod
     def from_range(cls, r: CodepointRange, value: Any):
