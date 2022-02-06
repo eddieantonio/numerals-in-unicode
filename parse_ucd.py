@@ -9,6 +9,8 @@ from math import nan
 from types import SimpleNamespace
 from typing import Any, NamedTuple
 
+###################################### Constants #######################################
+
 # https://www.unicode.org/reports/tr44/#UnicodeData.txt
 NAME = 1
 GENERAL_CATEGORY = 2
@@ -20,8 +22,16 @@ BIDI_MIRRORED = 9
 # https://www.unicode.org/reports/tr24/#Data_File_SC
 SCRIPT = 1
 
+###################################### Sentinels #######################################
+UsesNameRule = object()
+
 
 class CodepointRange(NamedTuple):
+    """
+    Represents a range of code points from a Unicode Character Database file.
+    Ranges are INCLUSIVE on both sides!
+    """
+
     start: int
     end_inclusive: int
 
@@ -59,64 +69,12 @@ class CodepointRange(NamedTuple):
         return iter(range(self.start, self.end_inclusive + 1))
 
 
-def parse_line(line: str):
-    r"""
-    Parses a line from a Unicode Character Database text file.
-
-    See: http://www.unicode.org/reports/tr44/#Format_Conventions
-
-    >>> parse_line("\n")
-    >>> parse_line("# I'm a comment\n")
-    >>> parse_line("0020          ; Common # Zs       SPACE")
-    (CodepointRange(start=32, end_inclusive=32), ['0020', 'Common'])
-    >>> parse_line("1D2E0..1D2F3  ; Common # No  [20] MAYAN NUMERAL ZERO..MAYAN NUMERAL NINETEEN")
-    (CodepointRange(start=119520, end_inclusive=119539), ['1D2E0..1D2F3', 'Common'])
+class PropertyLookup:
+    """
+    Enables lookups of Unicode character properties using a sparse data structure with
+    defaults for missing entries.
     """
 
-    line = line.rstrip("\n")
-    content, _, _comment = line.partition("#")
-
-    if content == "":
-        return None
-
-    # "Each line of data consists of fields separated by semicolons."
-    # "Leading and trailing spaces within a field are not significant."
-    # From: http://www.unicode.org/reports/tr44/#Data_Fields
-    fields = [field.strip() for field in content.split(";")]
-    assert len(fields) >= 2, f"Did not find enough fields in line: {line!r}"
-
-    range_expression = fields[0]
-
-    start_hex, range_marker, end_hex = range_expression.partition("..")
-    start = int(start_hex, base=16)
-
-    if range_marker:
-        # Found a range like 0030..0039:
-        end = int(end_hex, base=16)
-        code_point_range = CodepointRange(start, end)
-    else:
-        # Found a single codepoint.
-        code_point_range = CodepointRange(start, start)
-
-    return code_point_range, fields
-
-
-# Sentinels
-UsesNameRule = object()
-
-
-class PropertyRecord(NamedTuple):
-    start: int
-    end_inclusive: int
-    value: Any
-
-    @classmethod
-    def from_range(cls, r: CodepointRange, value: Any):
-        start, end = r
-        return cls(start, end, value)
-
-
-class PropertyLookup:
     def __init__(self, *, default):
         self._table = []
         self._default = default
@@ -168,7 +126,28 @@ class PropertyLookup:
         return len(self._table)
 
 
+class PropertyRecord(NamedTuple):
+    """
+    An entry in the PropertyLookup table.
+    """
+
+    start: int
+    end_inclusive: int
+    value: Any
+
+    @classmethod
+    def from_range(cls, r: CodepointRange, value: Any):
+        start, end = r
+        return cls(start, end, value)
+
+
 class NamePropertyLookup(PropertyLookup):
+    """
+    Specialized property lookup for the Name property.
+
+    Some of the values here are algorithmically generated.
+    """
+
     def __getitem__(self, codepoint: int) -> str:
         name = super().__getitem__(codepoint)
         if name is UsesNameRule:
@@ -266,6 +245,48 @@ def parse_scripts():
 
         for code_point_range, fields in ordered_lines:
             _script.extend_last(code_point_range, fields[SCRIPT])
+
+
+def parse_line(line: str):
+    r"""
+    Parses a line from a Unicode Character Database text file.
+
+    See: http://www.unicode.org/reports/tr44/#Format_Conventions
+
+    >>> parse_line("\n")
+    >>> parse_line("# I'm a comment\n")
+    >>> parse_line("0020          ; Common # Zs       SPACE")
+    (CodepointRange(start=32, end_inclusive=32), ['0020', 'Common'])
+    >>> parse_line("1D2E0..1D2F3  ; Common # No  [20] MAYAN NUMERAL ZERO..MAYAN NUMERAL NINETEEN")
+    (CodepointRange(start=119520, end_inclusive=119539), ['1D2E0..1D2F3', 'Common'])
+    """
+
+    line = line.rstrip("\n")
+    content, _, _comment = line.partition("#")
+
+    if content == "":
+        return None
+
+    # "Each line of data consists of fields separated by semicolons."
+    # "Leading and trailing spaces within a field are not significant."
+    # From: http://www.unicode.org/reports/tr44/#Data_Fields
+    fields = [field.strip() for field in content.split(";")]
+    assert len(fields) >= 2, f"Did not find enough fields in line: {line!r}"
+
+    range_expression = fields[0]
+
+    start_hex, range_marker, end_hex = range_expression.partition("..")
+    start = int(start_hex, base=16)
+
+    if range_marker:
+        # Found a range like 0030..0039:
+        end = int(end_hex, base=16)
+        code_point_range = CodepointRange(start, end)
+    else:
+        # Found a single codepoint.
+        code_point_range = CodepointRange(start, start)
+
+    return code_point_range, fields
 
 
 def parse_unicode_data_lines(lines):
