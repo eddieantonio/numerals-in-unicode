@@ -18,6 +18,7 @@ CODE_POINT_MAX = 0x10FFFF
 NAME = 1
 GENERAL_CATEGORY = 2
 BIDI_CLASS = 4
+DECOMPOSITION_MAPPING = 5
 NUMERICAL_VALUE_DECIMAL = 6
 NUMERICAL_VALUE_DIGIT = 7
 NUMERICAL_VALUE_NUMERIC = 8
@@ -257,6 +258,7 @@ class NamePropertyLookup(PropertyLookup):
 # https://www.unicode.org/reports/tr44/#Default_Values_Table
 _general_category = PropertyLookup(default="Cc")
 _name = NamePropertyLookup(default="")
+_decomposition = PropertyLookup(default="")
 _numeric_type = PropertyLookup(default=None)
 _numeric_value = PropertyLookup(default=nan)
 _script = PropertyLookup(default="Unknown")
@@ -269,6 +271,7 @@ def parse_all():
     return SimpleNamespace(
         general_category=_general_category,
         name=_name,
+        decomposition=_decomposition,
         numeric_type=_numeric_type,
         numeric_value=_numeric_value,
         script=_script,
@@ -310,6 +313,15 @@ def parse_unicode_data():
     0
     >>> _numeric_value[0x1D2E0 + 19]
     19
+
+    >>> _decomposition[ord('A')]
+    ''
+    >>> _decomposition[0x212B]
+    '00C5'
+    >>> _decomposition[ord('ở')]
+    '01A1 0309'
+    >>> _decomposition[0x01A1]
+    '006F 031B'
     """
     with open("./UnicodeData.txt", encoding="UTF-8") as data_file:
         return parse_unicode_data_lines(iter(data_file))
@@ -417,6 +429,8 @@ def parse_unicode_data_lines(lines):
             code_point_range,
             *fields[NUMERICAL_VALUE_DECIMAL : NUMERICAL_VALUE_NUMERIC + 1],
         )
+        if decomposition := fields[DECOMPOSITION_MAPPING]:
+            _decomposition.extend_last(code_point_range, decomposition)
 
 
 def add_name(code_point_range: CodepointRange, raw_name: str):

@@ -1,4 +1,4 @@
-from unicodedata import bidirectional, decomposition
+from unicodedata import bidirectional
 
 import parse_ucd
 
@@ -72,6 +72,8 @@ class Codepoint:
 
     @property
     def bidirectional_class(self) -> str:
+        # I'd love to remove the call to Python's built-in unicodedata.bidirectional,
+        # but it requires parsing YET ANOTHER file, which I don't feel like doing 😇
         return bidirectional(self.character)
 
     @property
@@ -84,7 +86,7 @@ class Codepoint:
 
     @property
     def decomposition(self) -> str:
-        return decomposition(self.character)
+        return _properties.decomposition[self._ord]
 
     def to_decimal(self, *args) -> int:
         if self.numeric_type == "Decimal":
