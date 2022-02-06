@@ -102,12 +102,11 @@ def parse_line(line: str):
 
 
 # Sentinels
-RaiseIndexError = object()
 UsesNameRule = object()
 
 
 class PropertyLookup:
-    def __init__(self, *, default=RaiseIndexError):
+    def __init__(self, *, default):
         self._table = []
         self._default = default
 
@@ -136,10 +135,7 @@ class PropertyLookup:
         try:
             return self._find(codepoint)
         except IndexError:
-            if self._default is RaiseIndexError:
-                raise
-            else:
-                return self._default
+            return self._default
 
     def _find(self, codepoint: int):
         table = self._table
