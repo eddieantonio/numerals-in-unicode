@@ -73,6 +73,10 @@ class PropertyLookup:
         self._table = []
         self._default = default
 
+        # Cache results when iterating sequentially throuh properties:
+        self._previous_record = InvalidPropertyRecord()
+        self._previous_index = None
+
     def extend_last(self, code_point_range: CodepointRange, value):
         try:
             last_start, last_end, previous_value = self._table[-1]
@@ -97,6 +101,34 @@ class PropertyLookup:
         return self._find(codepoint)
 
     def _find(self, codepoint: int):
+        record = self._previous_record
+
+        if record.contains(codepoint):
+            # Sequential access AND we're in the same range!
+            return record.value
+
+        if record.directly_before(codepoint):
+            # Sequential access! We just want the NEXT range, if it exists.
+            try:
+                record = self._table[self._previous_index + 1]
+            except IndexError:
+                # After the end of stored records. Must create a fake record
+                pass
+            else:
+                if record.contains(codepoint):
+                    # The next range EXISTS, so cache it!
+                    self._previous_record = record
+                    self._previous_index += 1
+                    return record.value
+
+        # Not a simple sequential access, so we have to search:
+        record, index = self._find_with_binary_search(codepoint)
+        self._previous_record = record
+        self._previous_index = index
+
+        return record.value
+
+    def _find_with_binary_search(self, codepoint: int):
         table = self._table
 
         def binary_search(start, end):
@@ -114,15 +146,13 @@ class PropertyLookup:
             elif codepoint > record.end_inclusive:
                 return binary_search(midpoint + 1, end)
 
-        record, index = binary_search(0, len(table))
-        return record.value
+        return binary_search(0, len(table))
 
     def _create_fake_record(self, codepoint: int, index: int):
         """
         Returns a synthesized PropertyRecord that is not actually stored.
 
-        Should only be called when a binary search fails, and given the index to the
-        next stored entry.
+        Should only be called with the index to the NEXT stored entry.
         """
 
         # Assume these are the store records:
@@ -151,10 +181,10 @@ class PropertyLookup:
         #     (    65,  90, 'X'), # index 1
         # ]
 
-        try:
+        if index > 0:
             # The fake entry must start after the PREVIOUS stored entry.
             fake_start = self._table[index - 1].end_inclusive + 1
-        except IndexError:
+        else:
             fake_start = CODE_POINT_MIN
 
         try:
@@ -182,10 +212,32 @@ class PropertyRecord(NamedTuple):
 
     contains = CodepointRange.contains
 
+    def directly_before(self, codepoint: int) -> bool:
+        return self.end_inclusive + 1 == codepoint
+
     @classmethod
     def from_range(cls, r: CodepointRange, value: Any):
         start, end = r
         return cls(start, end, value)
+
+
+class InvalidPropertyRecord:
+    """
+    Sentinel value
+    """
+
+    def contains(self, codepoint: int) -> bool:
+        return False
+
+    def directly_before(self, codepoint: int) -> bool:
+        return False
+
+    def _raise(self):
+        raise AssertionError("Should not access property of InvalidPropertyRecord")
+
+    start = property(_raise)
+    end_inclusive = property(_raise)
+    value = property(_raise)
 
 
 class NamePropertyLookup(PropertyLookup):
