@@ -79,20 +79,22 @@ class PropertyLookup:
         self._table = []
         self._default = default
 
-    def extend_last(self, range_: CodepointRange, value):
+    def extend_last(self, code_point_range: CodepointRange, value):
         try:
             last_start, last_end, previous_value = self._table[-1]
         except IndexError:
-            self._table.append(PropertyRecord.from_range(range_, value))
+            self._table.append(PropertyRecord.from_range(code_point_range, value))
             return
 
-        assert range_.start > last_end
+        assert code_point_range.start > last_end
 
-        if range_.start == last_end + 1 and value == previous_value:
+        if code_point_range.start == last_end + 1 and value == previous_value:
             # We can extend the previous range.
-            self._table[-1] = PropertyRecord(last_start, range_.end_inclusive, value)
+            self._table[-1] = PropertyRecord(
+                last_start, code_point_range.end_inclusive, value
+            )
         else:
-            self._table.append(PropertyRecord.from_range(range_, value))
+            self._table.append(PropertyRecord.from_range(code_point_range, value))
 
     def __getitem__(self, codepoint: int):
         if codepoint < 0 or codepoint > 0x10FFFF:
@@ -295,9 +297,9 @@ def parse_unicode_data_lines(lines):
         if result is None:
             continue
 
-        range_, fields = result
-        assert range_.is_single_code_point
-        codepoint, _ = range_
+        code_point_range, fields = result
+        assert code_point_range.is_single_code_point
+        codepoint, _ = code_point_range
 
         raw_name = fields[NAME]
 
@@ -310,25 +312,26 @@ def parse_unicode_data_lines(lines):
             assert ends_implied_range(next_fields[NAME])
             assert fields[2:] == next_fields[2:]
 
-            range_ = CodepointRange(codepoint, end_codepoint)
+            code_point_range = CodepointRange(codepoint, end_codepoint)
 
-        _general_category.extend_last(range_, fields[GENERAL_CATEGORY])
-        add_name(range_, raw_name)
+        _general_category.extend_last(code_point_range, fields[GENERAL_CATEGORY])
+        add_name(code_point_range, raw_name)
         add_numeral(
-            range_, *fields[NUMERICAL_VALUE_DECIMAL : NUMERICAL_VALUE_NUMERIC + 1]
+            code_point_range,
+            *fields[NUMERICAL_VALUE_DECIMAL : NUMERICAL_VALUE_NUMERIC + 1],
         )
 
 
-def add_name(range_: CodepointRange, raw_name: str):
+def add_name(code_point_range: CodepointRange, raw_name: str):
     """
     See: https://www.unicode.org/reports/tr44/#Name
     """
-    if range_.is_range:
+    if code_point_range.is_range:
         # I'm too lazy to implement codepoint range rules so...
         # https://www.unicode.org/versions/Unicode14.0.0/ch04.pdf
-        _name.extend_last(range_, NotImplemented)
+        _name.extend_last(code_point_range, NotImplemented)
     else:
-        _name.extend_last(range_, raw_name)
+        _name.extend_last(code_point_range, raw_name)
 
 
 def add_numeral(code_point_range: CodepointRange, decimal, digit, numeral):
