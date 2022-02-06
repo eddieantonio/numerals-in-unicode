@@ -11,6 +11,9 @@ from typing import Any, NamedTuple
 
 ###################################### Constants #######################################
 
+CODE_POINT_MIN = 0
+CODE_POINT_MAX = 0x10FFFF
+
 # https://www.unicode.org/reports/tr44/#UnicodeData.txt
 NAME = 1
 GENERAL_CATEGORY = 2
@@ -88,7 +91,7 @@ class PropertyLookup:
             self._table.append(PropertyRecord.from_range(code_point_range, value))
 
     def __getitem__(self, codepoint: int):
-        if codepoint < 0 or codepoint > 0x10FFFF:
+        if codepoint < CODE_POINT_MIN or codepoint > CODE_POINT_MAX:
             raise IndexError(codepoint)
 
         try:
@@ -118,7 +121,54 @@ class PropertyLookup:
         return record.value
 
     def _create_fake_record(self, codepoint: int, index: int):
-        return PropertyRecord(index, index, self._default), index
+        """
+        Returns a synthesized PropertyRecord that is not actually stored.
+
+        Should only be called when a binary search fails, and given the index to the
+        next stored entry.
+        """
+
+        # Assume these are the store records:
+        #
+        # [
+        #     # start  end  value
+        #     (    31,  31, 'X'),  # index 0
+        #     (    65,  90, 'X'),  # index 1
+        # ]
+        #
+        # We synthesize a record by looking at the neighbours of the failed binary
+        # search.
+        #
+        # Example:
+        # Binary search failed looking for a value for 48. It will fail at index 1.
+        #
+        #   codepoint = 48
+        #   index = 1
+        #
+        # We create a fake record by looking at its neighbours:
+        #
+        # [
+        #     # start  end  value
+        #     (    31,  31, 'X'), # index 0
+        #                          <- (32, 64, 'Default')
+        #     (    65,  90, 'X'), # index 1
+        # ]
+
+        try:
+            # The fake entry must start after the PREVIOUS stored entry.
+            fake_start = self._table[index - 1].end_inclusive + 1
+        except IndexError:
+            fake_start = CODE_POINT_MIN
+
+        try:
+            # The fake entry must end before the CURRENT stored entry.
+            fake_end = self._table[index].start - 1
+        except IndexError:
+            fake_end = CODE_POINT_MAX
+
+        assert fake_start <= codepoint <= fake_end
+
+        return PropertyRecord(fake_start, fake_end, self._default), index
 
     def __len__(self) -> int:
         return len(self._table)
