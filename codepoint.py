@@ -1,4 +1,4 @@
-from unicodedata import bidirectional, category, decomposition
+from unicodedata import bidirectional, decomposition
 
 import parse_ucd
 
@@ -64,7 +64,7 @@ class Codepoint:
 
     @property
     def general_category(self) -> str:
-        return category(self.character)
+        return _properties.general_category[self._ord]
 
     @property
     def script(self) -> str:
