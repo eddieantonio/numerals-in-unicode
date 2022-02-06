@@ -7,7 +7,7 @@ See: http://www.unicode.org/reports/tr44/#Format_Conventions
 from fractions import Fraction
 from math import nan
 from types import SimpleNamespace
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 # https://www.unicode.org/reports/tr44/#UnicodeData.txt
 NAME = 1
@@ -105,6 +105,17 @@ def parse_line(line: str):
 UsesNameRule = object()
 
 
+class PropertyRecord(NamedTuple):
+    start: int
+    end_inclusive: int
+    value: Any
+
+    @classmethod
+    def from_range(cls, r: CodepointRange, value: Any):
+        start, end = r
+        return cls(start, end, value)
+
+
 class PropertyLookup:
     def __init__(self, *, default):
         self._table = []
@@ -112,21 +123,18 @@ class PropertyLookup:
 
     def extend_last(self, range_: CodepointRange, value):
         try:
-            (last_start, last_end), previous_value = self._table[-1]
+            last_start, last_end, previous_value = self._table[-1]
         except IndexError:
-            self._table.append((range_, value))
+            self._table.append(PropertyRecord.from_range(range_, value))
             return
 
         assert range_.start > last_end
 
         if range_.start == last_end + 1 and value == previous_value:
             # We can extend the previous range.
-            self._table[-1] = (
-                CodepointRange(last_start, range_.end_inclusive),
-                value,
-            )
+            self._table[-1] = PropertyRecord(last_start, range_.end_inclusive, value)
         else:
-            self._table.append((range_, value))
+            self._table.append(PropertyRecord.from_range(range_, value))
 
     def __getitem__(self, codepoint: int):
         if codepoint < 0 or codepoint > 0x10FFFF:
@@ -145,13 +153,13 @@ class PropertyLookup:
                 raise IndexError(codepoint)
 
             midpoint = start + ((end - start) // 2)
-            range_, value = table[midpoint]
+            record_start, record_end, value = table[midpoint]
 
-            if range_.contains(codepoint):
+            if record_start <= codepoint <= record_end:
                 return value
-            elif codepoint < range_.start:
+            elif codepoint < record_start:
                 return binary_search(start, midpoint)
-            elif codepoint > range_.end_inclusive:
+            elif codepoint > record_end:
                 return binary_search(midpoint + 1, end)
 
         return binary_search(0, len(table))
