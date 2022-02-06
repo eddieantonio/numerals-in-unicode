@@ -94,10 +94,7 @@ class PropertyLookup:
         if codepoint < CODE_POINT_MIN or codepoint > CODE_POINT_MAX:
             raise IndexError(codepoint)
 
-        try:
-            return self._find(codepoint)
-        except IndexError:
-            return self._default
+        return self._find(codepoint)
 
     def _find(self, codepoint: int):
         table = self._table
