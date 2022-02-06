@@ -101,19 +101,24 @@ class PropertyLookup:
 
         def binary_search(start, end):
             if start >= end:
-                raise IndexError(codepoint)
+                # Could not find a record!
+                return self._create_fake_record(codepoint, start)
 
             midpoint = start + ((end - start) // 2)
-            record_start, record_end, value = table[midpoint]
+            record = table[midpoint]
 
-            if record_start <= codepoint <= record_end:
-                return value
-            elif codepoint < record_start:
+            if record.start <= codepoint <= record.end_inclusive:
+                return record, midpoint
+            elif codepoint < record.start:
                 return binary_search(start, midpoint)
-            elif codepoint > record_end:
+            elif codepoint > record.end_inclusive:
                 return binary_search(midpoint + 1, end)
 
-        return binary_search(0, len(table))
+        record, index = binary_search(0, len(table))
+        return record.value
+
+    def _create_fake_record(self, codepoint: int, index: int):
+        return PropertyRecord(index, index, self._default), index
 
     def __len__(self) -> int:
         return len(self._table)
